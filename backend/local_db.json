@@ -1,0 +1,140 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@store.com",
+      "password_hash": "$2a$10$bhqjdZ8.YFFLnvq5nXHV8eXe1E6ZDtmM17H1ba.NRmfnmEeBjXo/C"
+    }
+  ],
+  "suppliers": [
+    {
+      "id": 1,
+      "name": "Apex Electronics Ltd",
+      "contact_email": "sales@apexelectronics.com",
+      "phone": "+91 98765 43210"
+    },
+    {
+      "id": 2,
+      "name": "Global Tech Distributors",
+      "contact_email": "orders@globaltech.com",
+      "phone": "+91 99887 76655"
+    },
+    {
+      "id": 3,
+      "name": "Super Pack Wholesale",
+      "contact_email": "support@superpack.in",
+      "phone": "+91 88776 65544"
+    }
+  ],
+  "products": [
+    {
+      "id": 1,
+      "sku": "ELEC-MB-001",
+      "name": "Wireless Mouse Premium",
+      "description": "Ergonomic 2.4GHz wireless optical mouse with adjustable DPI.",
+      "price": 899,
+      "stock_quantity": 45,
+      "min_stock_level": 10,
+      "supplier_id": 1
+    },
+    {
+      "id": 2,
+      "sku": "ELEC-KB-002",
+      "name": "Mechanical Keyboard RGB",
+      "description": "Tactile mechanical keyboard with customizable RGB backlighting and blue switches.",
+      "price": 2499,
+      "stock_quantity": 4,
+      "min_stock_level": 8,
+      "supplier_id": 1
+    },
+    {
+      "id": 3,
+      "sku": "OFFC-CH-003",
+      "name": "Ergonomic Office Chair",
+      "description": "High-back office chair with adjustable lumbar support and mesh fabric.",
+      "price": 7499,
+      "stock_quantity": 12,
+      "min_stock_level": 3,
+      "supplier_id": 3
+    },
+    {
+      "id": 4,
+      "sku": "TECH-HD-004",
+      "name": "Noise Cancelling Headphones",
+      "description": "Active noise-cancelling over-ear Bluetooth headphones with 30h battery life.",
+      "price": 4999,
+      "stock_quantity": 2,
+      "min_stock_level": 5,
+      "supplier_id": 2
+    },
+    {
+      "id": 5,
+      "sku": "TECH-USB-005",
+      "name": "Type-C Hub 6-in-1",
+      "description": "Aluminum USB-C multi-port adapter with 4K HDMI, USB 3.0, and Power Delivery.",
+      "price": 1599,
+      "stock_quantity": 30,
+      "min_stock_level": 8,
+      "supplier_id": 2
+    }
+  ],
+  "transactions": [
+    {
+      "id": 1,
+      "product_id": 1,
+      "transaction_type": "IN",
+      "quantity": 50,
+      "date": "2026-05-14T16:49:55.873Z"
+    },
+    {
+      "id": 2,
+      "product_id": 1,
+      "transaction_type": "OUT",
+      "quantity": 5,
+      "date": "2026-05-16T16:49:55.874Z"
+    },
+    {
+      "id": 3,
+      "product_id": 2,
+      "transaction_type": "IN",
+      "quantity": 10,
+      "date": "2026-05-15T16:49:55.874Z"
+    },
+    {
+      "id": 4,
+      "product_id": 2,
+      "transaction_type": "OUT",
+      "quantity": 6,
+      "date": "2026-05-18T16:49:55.874Z"
+    },
+    {
+      "id": 5,
+      "product_id": 3,
+      "transaction_type": "IN",
+      "quantity": 15,
+      "date": "2026-05-13T16:49:55.874Z"
+    },
+    {
+      "id": 6,
+      "product_id": 3,
+      "transaction_type": "OUT",
+      "quantity": 3,
+      "date": "2026-05-19T04:49:55.874Z"
+    },
+    {
+      "id": 7,
+      "product_id": 4,
+      "transaction_type": "IN",
+      "quantity": 5,
+      "date": "2026-05-17T16:49:55.874Z"
+    },
+    {
+      "id": 8,
+      "product_id": 4,
+      "transaction_type": "OUT",
+      "quantity": 3,
+      "date": "2026-05-19T14:49:55.874Z"
+    }
+  ]
+}
