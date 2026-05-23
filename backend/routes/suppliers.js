@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 // GET /api/suppliers - Fetch all suppliers (Auth required)
 router.get('/', auth, async (req, res) => {
   try {
-    const suppliers = await db.suppliers.findAll();
+    const suppliers = await db.suppliers.findAll(req.user.id);
     res.json(suppliers);
   } catch (error) {
     console.error('Fetch Suppliers Error:', error);
@@ -23,7 +23,7 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: 'Please provide supplier name, email, and phone number.' });
     }
 
-    const newSupplier = await db.suppliers.create({ name, contact_email, phone });
+    const newSupplier = await db.suppliers.create({ name, contact_email, phone, userId: req.user.id });
     res.status(201).json(newSupplier);
   } catch (error) {
     console.error('Create Supplier Error:', error);

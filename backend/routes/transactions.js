@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 // GET /api/transactions - Fetch all transactions (Auth required)
 router.get('/', auth, async (req, res) => {
   try {
-    const transactions = await db.transactions.findAll();
+    const transactions = await db.transactions.findAll(req.user.id);
     res.json(transactions);
   } catch (error) {
     console.error('Fetch Transactions Error:', error);
@@ -36,7 +36,8 @@ router.post('/', auth, async (req, res) => {
     const result = await db.transactions.create({
       product_id: parseInt(product_id, 10),
       transaction_type,
-      quantity: qty
+      quantity: qty,
+      userId: req.user.id
     });
 
     res.status(201).json({

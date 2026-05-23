@@ -64,7 +64,9 @@ async function createMySQLTables() {
       name VARCHAR(255) NOT NULL,
       contact_email VARCHAR(255) NOT NULL,
       phone VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      user_id INT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`,
     `CREATE TABLE IF NOT EXISTS products (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -75,8 +77,10 @@ async function createMySQLTables() {
       stock_quantity INT NOT NULL DEFAULT 0,
       min_stock_level INT NOT NULL DEFAULT 5,
       supplier_id INT,
+      user_id INT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
+      FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`,
     `CREATE TABLE IF NOT EXISTS transactions (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -92,6 +96,27 @@ async function createMySQLTables() {
     await pool.query(query);
   }
   console.log('[Database] MySQL tables verified/created successfully.');
+
+  // Run dynamic safe ALTER migrations to include user_id columns on existing DB tables
+  try {
+    const [sCols] = await pool.query("SHOW COLUMNS FROM suppliers LIKE 'user_id'");
+    if (sCols.length === 0) {
+      await pool.query("ALTER TABLE suppliers ADD COLUMN user_id INT NULL, ADD CONSTRAINT fk_suppliers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+      console.log("[Database] Migrated existing suppliers table to include user_id.");
+    }
+  } catch (err) {
+    console.warn("[Database] Migration warning for suppliers: ", err.message);
+  }
+
+  try {
+    const [pCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'user_id'");
+    if (pCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN user_id INT NULL, ADD CONSTRAINT fk_products_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+      console.log("[Database] Migrated existing products table to include user_id.");
+    }
+  } catch (err) {
+    console.warn("[Database] Migration warning for products: ", err.message);
+  }
 
   // Seed default admin user in MySQL if users table is empty
   try {
@@ -111,6 +136,14 @@ async function createMySQLTables() {
     console.error('[Database] Failed to seed default administrator in MySQL:', error.message);
   }
 
+  // Ensure any existing suppliers/products without a user_id default to admin user (id=1)
+  try {
+    await pool.query("UPDATE suppliers SET user_id = 1 WHERE user_id IS NULL");
+    await pool.query("UPDATE products SET user_id = 1 WHERE user_id IS NULL");
+  } catch (err) {
+    console.warn("[Database] Migration warning while updating default user_id values: ", err.message);
+  }
+
   // Seed default suppliers in MySQL if empty
   try {
     const [sRows] = await pool.query('SELECT COUNT(*) as count FROM suppliers');
@@ -122,7 +155,7 @@ async function createMySQLTables() {
       ];
       for (const s of defaultSuppliers) {
         await pool.query(
-          'INSERT INTO suppliers (name, contact_email, phone) VALUES (?, ?, ?)',
+          'INSERT INTO suppliers (name, contact_email, phone, user_id) VALUES (?, ?, ?, 1)',
           s
         );
       }
@@ -145,7 +178,7 @@ async function createMySQLTables() {
 
       const defaultProducts = [
         ['ELEC-MB-001', 'Wireless Mouse Premium', 'Ergonomic 2.4GHz wireless optical mouse with adjustable DPI.', 899.00, 45, 10, getSupplierId('Apex Electronics Ltd')],
-        ['ELEC-KB-002', 'Mechanical Keyboard RGB', 'Tactile mechanical keyboard with customizable RGB backlighting and blue switches.', 2499.00, 4, 8, getSupplierId('Apex Electronics Ltd')],
+        ['ELEC-KB-002', 'Mechanical Keyboard RGB', 'Tactile mechanical keyboard with customizable RGB backlighting and RGB switches.', 2499.00, 4, 8, getSupplierId('Apex Electronics Ltd')],
         ['OFFC-CH-003', 'Ergonomic Office Chair', 'High-back office chair with adjustable lumbar support and mesh fabric.', 7499.00, 12, 3, getSupplierId('Super Pack Wholesale')],
         ['TECH-HD-004', 'Noise Cancelling Headphones', 'Active noise-cancelling over-ear Bluetooth headphones with 30h battery life.', 4999.00, 2, 5, getSupplierId('Global Tech Distributors')],
         ['TECH-USB-005', 'Type-C Hub 6-in-1', 'Aluminum USB-C multi-port adapter with 4K HDMI, USB 3.0, and Power Delivery.', 1599.00, 30, 8, getSupplierId('Global Tech Distributors')]
@@ -153,7 +186,7 @@ async function createMySQLTables() {
 
       for (const p of defaultProducts) {
         await pool.query(
-          'INSERT INTO products (sku, name, description, price, stock_quantity, min_stock_level, supplier_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO products (sku, name, description, price, stock_quantity, min_stock_level, supplier_id, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
           p
         );
       }
@@ -213,9 +246,9 @@ function initJSONDB() {
         }
       ],
       suppliers: [
-        { id: 1, name: "Apex Electronics Ltd", contact_email: "sales@apexelectronics.com", phone: "+91 98765 43210" },
-        { id: 2, name: "Global Tech Distributors", contact_email: "orders@globaltech.com", phone: "+91 99887 76655" },
-        { id: 3, name: "Super Pack Wholesale", contact_email: "support@superpack.in", phone: "+91 88776 65544" }
+        { id: 1, name: "Apex Electronics Ltd", contact_email: "sales@apexelectronics.com", phone: "+91 98765 43210", user_id: 1 },
+        { id: 2, name: "Global Tech Distributors", contact_email: "orders@globaltech.com", phone: "+91 99887 76655", user_id: 1 },
+        { id: 3, name: "Super Pack Wholesale", contact_email: "support@superpack.in", phone: "+91 88776 65544", user_id: 1 }
       ],
       products: [
         {
@@ -226,17 +259,19 @@ function initJSONDB() {
           price: 899.00,
           stock_quantity: 45,
           min_stock_level: 10,
-          supplier_id: 1
+          supplier_id: 1,
+          user_id: 1
         },
         {
           id: 2,
           sku: "ELEC-KB-002",
           name: "Mechanical Keyboard RGB",
-          description: "Tactile mechanical keyboard with customizable RGB backlighting and blue switches.",
+          description: "Tactile mechanical keyboard with customizable RGB backlighting and RGB switches.",
           price: 2499.00,
           stock_quantity: 4, // Triggering low-stock alert!
           min_stock_level: 8,
-          supplier_id: 1
+          supplier_id: 1,
+          user_id: 1
         },
         {
           id: 3,
@@ -246,7 +281,8 @@ function initJSONDB() {
           price: 7499.00,
           stock_quantity: 12,
           min_stock_level: 3,
-          supplier_id: 3
+          supplier_id: 3,
+          user_id: 1
         },
         {
           id: 4,
@@ -256,7 +292,8 @@ function initJSONDB() {
           price: 4999.00,
           stock_quantity: 2, // Triggering low-stock alert!
           min_stock_level: 5,
-          supplier_id: 2
+          supplier_id: 2,
+          user_id: 1
         },
         {
           id: 5,
@@ -266,7 +303,8 @@ function initJSONDB() {
           price: 1599.00,
           stock_quantity: 30,
           min_stock_level: 8,
-          supplier_id: 2
+          supplier_id: 2,
+          user_id: 1
         }
       ],
       transactions: [
@@ -346,24 +384,43 @@ const db = {
         if (!user) return null;
         return { id: user.id, username: user.username, email: user.email };
       }
+    },
+
+    async updatePassword(email, newPasswordHash) {
+      if (useMySQL) {
+        await pool.query(
+          'UPDATE users SET password_hash = ? WHERE email = ?',
+          [newPasswordHash, email]
+        );
+        return true;
+      } else {
+        const data = readJSONData();
+        const userIndex = data.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+        if (userIndex === -1) return false;
+        data.users[userIndex].password_hash = newPasswordHash;
+        writeJSONData(data);
+        return true;
+      }
     }
   },
 
   suppliers: {
-    async create({ name, contact_email, phone }) {
+    async create({ name, contact_email, phone, userId }) {
+      const uId = userId ? parseInt(userId, 10) : null;
       if (useMySQL) {
         const [result] = await pool.query(
-          'INSERT INTO suppliers (name, contact_email, phone) VALUES (?, ?, ?)',
-          [name, contact_email, phone]
+          'INSERT INTO suppliers (name, contact_email, phone, user_id) VALUES (?, ?, ?, ?)',
+          [name, contact_email, phone, uId]
         );
-        return { id: result.insertId, name, contact_email, phone };
+        return { id: result.insertId, name, contact_email, phone, user_id: uId };
       } else {
         const data = readJSONData();
         const newSupplier = {
           id: data.suppliers.length ? Math.max(...data.suppliers.map(s => s.id)) + 1 : 1,
           name,
           contact_email,
-          phone
+          phone,
+          user_id: uId
         };
         data.suppliers.push(newSupplier);
         writeJSONData(data);
@@ -371,43 +428,49 @@ const db = {
       }
     },
 
-    async findAll() {
+    async findAll(userId) {
+      const uId = userId ? parseInt(userId, 10) : null;
       if (useMySQL) {
-        const [rows] = await pool.query('SELECT * FROM suppliers ORDER BY name ASC');
+        const [rows] = await pool.query('SELECT * FROM suppliers WHERE user_id = ? ORDER BY name ASC', [uId]);
         return rows;
       } else {
         const data = readJSONData();
-        return [...data.suppliers].sort((a, b) => a.name.localeCompare(b.name));
+        return data.suppliers
+          .filter(s => s.user_id === uId)
+          .sort((a, b) => a.name.localeCompare(b.name));
       }
     },
 
-    async findById(id) {
+    async findById(id, userId) {
+      const uId = userId ? parseInt(userId, 10) : null;
+      const sid = parseInt(id, 10);
       if (useMySQL) {
-        const [rows] = await pool.query('SELECT * FROM suppliers WHERE id = ?', [id]);
+        const [rows] = await pool.query('SELECT * FROM suppliers WHERE id = ? AND user_id = ?', [sid, uId]);
         return rows[0] || null;
       } else {
         const data = readJSONData();
-        return data.suppliers.find(s => s.id === parseInt(id, 10)) || null;
+        return data.suppliers.find(s => s.id === sid && s.user_id === uId) || null;
       }
     }
   },
 
   products: {
-    async create({ sku, name, description, price, stock_quantity, min_stock_level, supplier_id }) {
+    async create({ sku, name, description, price, stock_quantity, min_stock_level, supplier_id, userId }) {
       const pPrice = parseFloat(price);
       const pStock = parseInt(stock_quantity, 10);
       const pMinStock = parseInt(min_stock_level, 10);
       const pSupplierId = supplier_id ? parseInt(supplier_id, 10) : null;
+      const uId = userId ? parseInt(userId, 10) : null;
 
       if (useMySQL) {
         const [result] = await pool.query(
-          'INSERT INTO products (sku, name, description, price, stock_quantity, min_stock_level, supplier_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [sku, name, description, pPrice, pStock, pMinStock, pSupplierId]
+          'INSERT INTO products (sku, name, description, price, stock_quantity, min_stock_level, supplier_id, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [sku, name, description, pPrice, pStock, pMinStock, pSupplierId, uId]
         );
-        return { id: result.insertId, sku, name, description, price: pPrice, stock_quantity: pStock, min_stock_level: pMinStock, supplier_id: pSupplierId };
+        return { id: result.insertId, sku, name, description, price: pPrice, stock_quantity: pStock, min_stock_level: pMinStock, supplier_id: pSupplierId, user_id: uId };
       } else {
         const data = readJSONData();
-        if (data.products.some(p => p.sku.toLowerCase() === sku.toLowerCase())) {
+        if (data.products.some(p => p.sku.toLowerCase() === sku.toLowerCase() && p.user_id === uId)) {
           throw new Error('A product with this SKU already exists.');
         }
         const newProduct = {
@@ -418,7 +481,8 @@ const db = {
           price: pPrice,
           stock_quantity: pStock,
           min_stock_level: pMinStock,
-          supplier_id: pSupplierId
+          supplier_id: pSupplierId,
+          user_id: uId
         };
         data.products.push(newProduct);
         writeJSONData(data);
@@ -426,39 +490,46 @@ const db = {
       }
     },
 
-    async findAll() {
+    async findAll(userId) {
+      const uId = userId ? parseInt(userId, 10) : null;
       if (useMySQL) {
         const [rows] = await pool.query(`
           SELECT p.*, s.name as supplier_name 
           FROM products p 
           LEFT JOIN suppliers s ON p.supplier_id = s.id 
+          WHERE p.user_id = ?
           ORDER BY p.name ASC
-        `);
+        `, [uId]);
         return rows;
       } else {
         const data = readJSONData();
-        return data.products.map(p => {
-          const supplier = data.suppliers.find(s => s.id === p.supplier_id);
-          return {
-            ...p,
-            supplier_name: supplier ? supplier.name : null
-          };
-        }).sort((a, b) => a.name.localeCompare(b.name));
+        return data.products
+          .filter(p => p.user_id === uId)
+          .map(p => {
+            const supplier = data.suppliers.find(s => s.id === p.supplier_id);
+            return {
+              ...p,
+              supplier_name: supplier ? supplier.name : null
+            };
+          }).sort((a, b) => a.name.localeCompare(b.name));
       }
     },
 
-    async findById(id) {
+    async findById(id, userId) {
+      const uId = userId ? parseInt(userId, 10) : null;
+      const pid = parseInt(id, 10);
       if (useMySQL) {
-        const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+        const [rows] = await pool.query('SELECT * FROM products WHERE id = ? AND user_id = ?', [pid, uId]);
         return rows[0] || null;
       } else {
         const data = readJSONData();
-        return data.products.find(p => p.id === parseInt(id, 10)) || null;
+        return data.products.find(p => p.id === pid && p.user_id === uId) || null;
       }
     },
 
-    async update(id, updates) {
+    async update(id, updates, userId) {
       const pid = parseInt(id, 10);
+      const uId = userId ? parseInt(userId, 10) : null;
       if (useMySQL) {
         const fields = [];
         const values = [];
@@ -470,12 +541,13 @@ const db = {
         }
         if (fields.length === 0) return null;
         values.push(pid);
-        await pool.query(`UPDATE products SET ${fields.join(', ')} WHERE id = ?`, values);
-        const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [pid]);
-        return rows[0];
+        values.push(uId);
+        await pool.query(`UPDATE products SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`, values);
+        const [rows] = await pool.query('SELECT * FROM products WHERE id = ? AND user_id = ?', [pid, uId]);
+        return rows[0] || null;
       } else {
         const data = readJSONData();
-        const index = data.products.findIndex(p => p.id === pid);
+        const index = data.products.findIndex(p => p.id === pid && p.user_id === uId);
         if (index === -1) return null;
 
         const original = data.products[index];
@@ -487,7 +559,7 @@ const db = {
           }
         }
 
-        if (updated.sku !== original.sku && data.products.some(p => p.sku.toLowerCase() === updated.sku.toLowerCase() && p.id !== pid)) {
+        if (updated.sku !== original.sku && data.products.some(p => p.sku.toLowerCase() === updated.sku.toLowerCase() && p.id !== pid && p.user_id === uId)) {
           throw new Error('A product with this SKU already exists.');
         }
 
@@ -497,15 +569,16 @@ const db = {
       }
     },
 
-    async delete(id) {
+    async delete(id, userId) {
       const pid = parseInt(id, 10);
+      const uId = userId ? parseInt(userId, 10) : null;
       if (useMySQL) {
-        const [result] = await pool.query('DELETE FROM products WHERE id = ?', [pid]);
+        const [result] = await pool.query('DELETE FROM products WHERE id = ? AND user_id = ?', [pid, uId]);
         return result.affectedRows > 0;
       } else {
         const data = readJSONData();
         const initialLength = data.products.length;
-        data.products = data.products.filter(p => p.id !== pid);
+        data.products = data.products.filter(p => !(p.id === pid && p.user_id === uId));
         // Cascading deletion of transactions linked to this product (JSON mode)
         data.transactions = data.transactions.filter(t => t.product_id !== pid);
         writeJSONData(data);
@@ -513,20 +586,21 @@ const db = {
       }
     },
 
-    async findLowStock() {
+    async findLowStock(userId) {
+      const uId = userId ? parseInt(userId, 10) : null;
       if (useMySQL) {
         const [rows] = await pool.query(`
           SELECT p.*, s.name as supplier_name 
           FROM products p 
           LEFT JOIN suppliers s ON p.supplier_id = s.id 
-          WHERE p.stock_quantity <= p.min_stock_level
+          WHERE p.stock_quantity <= p.min_stock_level AND p.user_id = ?
           ORDER BY p.stock_quantity ASC
-        `);
+        `, [uId]);
         return rows;
       } else {
         const data = readJSONData();
         return data.products
-          .filter(p => p.stock_quantity <= p.min_stock_level)
+          .filter(p => p.stock_quantity <= p.min_stock_level && p.user_id === uId)
           .map(p => {
             const supplier = data.suppliers.find(s => s.id === p.supplier_id);
             return {
@@ -540,9 +614,10 @@ const db = {
   },
 
   transactions: {
-    async create({ product_id, transaction_type, quantity }) {
+    async create({ product_id, transaction_type, quantity, userId }) {
       const prodId = parseInt(product_id, 10);
       const qty = parseInt(quantity, 10);
+      const uId = userId ? parseInt(userId, 10) : null;
       if (!['IN', 'OUT'].includes(transaction_type)) {
         throw new Error("Invalid transaction type. Must be 'IN' or 'OUT'.");
       }
@@ -555,8 +630,8 @@ const db = {
         try {
           await connection.beginTransaction();
 
-          // Check current product stock
-          const [prods] = await connection.query('SELECT stock_quantity, min_stock_level, name FROM products WHERE id = ? FOR UPDATE', [prodId]);
+          // Check current product stock and owner
+          const [prods] = await connection.query('SELECT stock_quantity, min_stock_level, name FROM products WHERE id = ? AND user_id = ? FOR UPDATE', [prodId, uId]);
           if (prods.length === 0) throw new Error("Product not found");
 
           const product = prods[0];
@@ -572,7 +647,7 @@ const db = {
           }
 
           // Update stock_quantity
-          await connection.query('UPDATE products SET stock_quantity = ? WHERE id = ?', [newStock, prodId]);
+          await connection.query('UPDATE products SET stock_quantity = ? WHERE id = ? AND user_id = ?', [newStock, prodId, uId]);
 
           // Create transaction record
           const [result] = await connection.query(
@@ -599,7 +674,7 @@ const db = {
         }
       } else {
         const data = readJSONData();
-        const productIndex = data.products.findIndex(p => p.id === prodId);
+        const productIndex = data.products.findIndex(p => p.id === prodId && p.user_id === uId);
         if (productIndex === -1) throw new Error("Product not found");
 
         const product = data.products[productIndex];
@@ -637,25 +712,32 @@ const db = {
       }
     },
 
-    async findAll() {
+    async findAll(userId) {
+      const uId = userId ? parseInt(userId, 10) : null;
       if (useMySQL) {
         const [rows] = await pool.query(`
           SELECT t.*, p.name as product_name, p.sku as product_sku
           FROM transactions t
           JOIN products p ON t.product_id = p.id
+          WHERE p.user_id = ?
           ORDER BY t.date DESC
-        `);
+        `, [uId]);
         return rows;
       } else {
         const data = readJSONData();
-        return data.transactions.map(t => {
-          const product = data.products.find(p => p.id === t.product_id) || { name: 'Unknown Product', sku: 'N/A' };
-          return {
-            ...t,
-            product_name: product.name,
-            product_sku: product.sku
-          };
-        }).sort((a, b) => new Date(b.date) - new Date(a.date));
+        return data.transactions
+          .filter(t => {
+            const product = data.products.find(p => p.id === t.product_id && p.user_id === uId);
+            return !!product;
+          })
+          .map(t => {
+            const product = data.products.find(p => p.id === t.product_id) || { name: 'Unknown Product', sku: 'N/A' };
+            return {
+              ...t,
+              product_name: product.name,
+              product_sku: product.sku
+            };
+          }).sort((a, b) => new Date(b.date) - new Date(a.date));
       }
     }
   }

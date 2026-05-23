@@ -45,6 +45,7 @@ function MainAppContent() {
     notification,
     login,
     register,
+    resetPassword,
     deleteProduct,
     recordStockTransaction
   } = useApp();
@@ -53,8 +54,8 @@ function MainAppContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Auth Screen State
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
-  const [authForm, setAuthForm] = useState({ username: '', email: '', password: '' });
+  const [authMode, setAuthMode] = useState('login'); // 'login', 'register', or 'forgot'
+  const [authForm, setAuthForm] = useState({ username: '', email: '', password: '', confirmPassword: '' });
   const [authError, setAuthError] = useState('');
 
   // Modals state
@@ -74,8 +75,16 @@ function MainAppContent() {
     try {
       if (authMode === 'login') {
         await login(authForm.email, authForm.password);
-      } else {
+      } else if (authMode === 'register') {
         await register(authForm.username, authForm.email, authForm.password);
+      } else if (authMode === 'forgot') {
+        if (authForm.password !== authForm.confirmPassword) {
+          setAuthError('Passwords do not match.');
+          return;
+        }
+        await resetPassword(authForm.email, authForm.password, authForm.confirmPassword);
+        setAuthMode('login');
+        setAuthForm({ username: '', email: '', password: '', confirmPassword: '' });
       }
     } catch (err) {
       setAuthError(err.response?.data?.error || 'Authentication action failed. Verify inputs.');
@@ -128,7 +137,11 @@ function MainAppContent() {
           </div>
 
           <h3 className="text-lg font-bold text-slate-100 text-center mb-6">
-            {authMode === 'login' ? 'Access Inventory Workspace' : 'Register New Merchant'}
+            {authMode === 'login' 
+              ? 'Access Inventory Workspace' 
+              : authMode === 'register' 
+                ? 'Register New Merchant' 
+                : 'Reset Secure Password'}
           </h3>
 
           {authError && (
@@ -166,41 +179,99 @@ function MainAppContent() {
               />
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Secure Password</label>
-              <input
-                type="password"
-                name="password"
-                placeholder="••••••••"
-                value={authForm.password}
-                onChange={handleAuthFieldChange}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
+            {authMode !== 'forgot' ? (
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Secure Password</label>
+                  {authMode === 'login' && (
+                    <button 
+                      type="button" 
+                      onClick={() => { setAuthMode('forgot'); setAuthError(''); }}
+                      className="text-[10px] font-bold text-brand-400 hover:text-brand-300 transition-colors bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="••••••••"
+                  value={authForm.password}
+                  onChange={handleAuthFieldChange}
+                  required
+                  className="w-full px-4 py-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">New Secure Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    placeholder="••••••••"
+                    value={authForm.password}
+                    onChange={handleAuthFieldChange}
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Confirm New Password</label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    placeholder="••••••••"
+                    value={authForm.confirmPassword}
+                    onChange={handleAuthFieldChange}
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+              </>
+            )}
 
             <button
               type="submit"
               disabled={authLoading}
               className="w-full py-3.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-xl shadow-lg shadow-brand-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 text-xs tracking-wider uppercase"
             >
-              {authLoading ? 'Authorizing Context...' : authMode === 'login' ? 'Login Dashboard' : 'Register Merchant'}
+              {authLoading 
+                ? 'Authorizing Context...' 
+                : authMode === 'login' 
+                  ? 'Login Dashboard' 
+                  : authMode === 'register' 
+                    ? 'Register Merchant' 
+                    : 'Reset Password'}
             </button>
           </form>
 
-          {/* Toggle login / register */}
+          {/* Toggle login / register / forgot */}
           <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setAuthMode(authMode === 'login' ? 'register' : 'login');
-                setAuthError('');
-              }}
-              className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
-            >
-              {authMode === 'login' 
-                ? "First time here? Register business account" 
-                : "Already registered? Login to existing workspace"}
-            </button>
+            {authMode === 'forgot' ? (
+              <button
+                onClick={() => {
+                  setAuthMode('login');
+                  setAuthError('');
+                }}
+                className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
+              >
+                Back to Login Portal
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setAuthMode(authMode === 'login' ? 'register' : 'login');
+                  setAuthError('');
+                }}
+                className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
+              >
+                {authMode === 'login' 
+                  ? "First time here? Register business account" 
+                  : "Already registered? Login to existing workspace"}
+              </button>
+            )}
           </div>
 
         </div>

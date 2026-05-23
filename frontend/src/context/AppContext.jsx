@@ -139,6 +139,18 @@ export const AppProvider = ({ children }) => {
     triggerNotification('Logged out successfully.', 'info');
   };
 
+  const resetPassword = async (email, newPassword, confirmPassword) => {
+    try {
+      const data = await authAPI.resetPassword(email, newPassword, confirmPassword);
+      triggerNotification(data.message || 'Password reset successful!', 'success');
+      return true;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Password reset failed.';
+      triggerNotification(message, 'error');
+      throw error;
+    }
+  };
+
   // CRUD Wrapper Operations
   const addProduct = async (productData) => {
     try {
@@ -300,6 +312,7 @@ export const AppProvider = ({ children }) => {
         login,
         register,
         logout,
+        resetPassword,
         fetchCoreData,
         addProduct,
         updateProduct,

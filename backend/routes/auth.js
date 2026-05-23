@@ -106,4 +106,41 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+// POST /api/auth/reset-password - Reset password for a verified email
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword, confirmPassword } = req.body;
+
+    if (!email || !newPassword || !confirmPassword) {
+      return res.status(400).json({ error: 'Please provide email, new password, and confirm password.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match.' });
+    }
+
+    // Check if user exists
+    const user = await db.users.findByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: 'User with this email address does not exist.' });
+    }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    await db.users.updatePassword(email, password_hash);
+
+    res.json({ message: 'Password updated successfully! You can now log in.' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ error: 'Internal server error during password reset.' });
+  }
+});
+
 module.exports = router;

@@ -7,7 +7,7 @@ const auth = require('../middleware/auth');
 // Put this ABOVE GET /:id so it doesn't get treated as an ID parameter
 router.get('/low-stock', auth, async (req, res) => {
   try {
-    const lowStockProducts = await db.products.findLowStock();
+    const lowStockProducts = await db.products.findLowStock(req.user.id);
     res.json(lowStockProducts);
   } catch (error) {
     console.error('Fetch Low Stock Error:', error);
@@ -18,7 +18,7 @@ router.get('/low-stock', auth, async (req, res) => {
 // GET /api/products - Fetch all products (Auth required)
 router.get('/', auth, async (req, res) => {
   try {
-    const products = await db.products.findAll();
+    const products = await db.products.findAll(req.user.id);
     res.json(products);
   } catch (error) {
     console.error('Fetch Products Error:', error);
@@ -54,7 +54,8 @@ router.post('/', auth, async (req, res) => {
       price: parseFloat(price),
       stock_quantity: parseInt(stock_quantity, 10),
       min_stock_level: min_stock_level !== undefined ? parseInt(min_stock_level, 10) : 5,
-      supplier_id: supplier_id ? parseInt(supplier_id, 10) : null
+      supplier_id: supplier_id ? parseInt(supplier_id, 10) : null,
+      userId: req.user.id
     });
 
     res.status(201).json(newProduct);
@@ -95,7 +96,7 @@ router.put('/:id', auth, async (req, res) => {
     if (min_stock_level !== undefined) updates.min_stock_level = parseInt(min_stock_level, 10);
     if (supplier_id !== undefined) updates.supplier_id = supplier_id ? parseInt(supplier_id, 10) : null;
 
-    const updatedProduct = await db.products.update(id, updates);
+    const updatedProduct = await db.products.update(id, updates, req.user.id);
     if (!updatedProduct) {
       return res.status(404).json({ error: 'Product not found.' });
     }
@@ -114,7 +115,7 @@ router.put('/:id', auth, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
-    const success = await db.products.delete(id);
+    const success = await db.products.delete(id, req.user.id);
     if (!success) {
       return res.status(404).json({ error: 'Product not found.' });
     }
